@@ -6,6 +6,9 @@ import assimp.AiNode;
 import assimp.AiPostProcess;
 import assimp.AiScene;
 import assimp.AssimpImporter;
+import assimp.math.AiMatrix4x4;
+import assimp.math.AiQuaternion;
+import assimp.math.AiVector3D;
 import kha.Assets;
 import kha.Color;
 import kha.Framebuffer;
@@ -49,8 +52,8 @@ class Project
             meshes = new Array<Mesh>();
             diffuseImage = Assets.images.diffuse;
             
-            projectionMatrix = FastMatrix4.perspectiveProjection(45 * Math.PI / 180, Main.WIDTH / Main.HEIGHT, 0.1, 1000);
-            viewMatrix = FastMatrix4.lookAt(new FastVector3( -10, 10, -10), new FastVector3(0, 0, 0), new FastVector3(0, 1, 0));
+            projectionMatrix = FastMatrix4.perspectiveProjection(45 * Math.PI / 180, Main.WIDTH / Main.HEIGHT, 0.1, 2000);
+            viewMatrix = FastMatrix4.lookAt(new FastVector3( 800, 700, 800), new FastVector3(0, 400, 0), new FastVector3(0, 1, 0));
             
             processNode(scene.rootNode);
             
@@ -61,25 +64,23 @@ class Project
     
     private function processNode(node:AiNode):Void
     {
-        /*for (i in 0...node.numMeshes) {
+        for (i in 0...node.numMeshes) {
             var meshIndex:Int = node.meshes[i];
             processMesh(node, scene.meshes[meshIndex], i);
         }
+        
         for (i in 0...node.numChildren) {
             processNode(node.children[i]);
-        }*/
-        
-        for (i in 0...node.numMeshes) {
-            processMesh(node, untyped __cpp__("scene->ptr->mMeshes[node->ptr->mMeshes[i]]"), i);
-        }
-        for (j in 0...node.numChildren) {
-            processNode( untyped __cpp__("node->ptr->mChildren[j]") );
         }
     }
     
     private function processMesh(node:AiNode, aiMesh:AiMesh, index:Int):Void
     {
-        var transformation:FastMatrix4 = FastMatrix4.identity();
+        var transformation:FastMatrix4 = new FastMatrix4(
+                node.transformation.a1, node.transformation.a2, node.transformation.a3, node.transformation.a4,
+                node.transformation.b1, node.transformation.b2, node.transformation.b3, node.transformation.b4,
+                node.transformation.c1, node.transformation.c2, node.transformation.c3, node.transformation.c4,
+                node.transformation.d1, node.transformation.d2, node.transformation.d3, node.transformation.d4);
         
         var data:Array<Float> = new Array<Float>();
         var indices:Array<Int> = new Array<Int>();
@@ -100,10 +101,10 @@ class Project
             data.push(v);
         }
         
-        for (j in 0...aiMesh.numFaces) {
-            var aiFace:AiFace = untyped __cpp__ ("aiMesh->ptr->mFaces[j]");
-            for (k in 0...aiFace.numIndices) {
-                var index:Int = untyped __cpp__ ("aiFace.mIndices[k]");
+        for (i in 0...aiMesh.numFaces) {
+            var aiFace:AiFace = aiMesh.faces[i];
+            for (j in 0...aiFace.numIndices) {
+                var index:Int = aiFace.indices[j];
                 indices.push(index);
             }
         }

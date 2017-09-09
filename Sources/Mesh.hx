@@ -38,7 +38,7 @@ class Mesh
                 case VertexData.Float4:
                     structureLength += 4;
                 case VertexData.Float4x4:
-                    structureLength += 14;
+                    structureLength += 64;
             }
         }
         
