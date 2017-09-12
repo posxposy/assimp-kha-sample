@@ -9,6 +9,8 @@ import assimp.AssimpImporter;
 import assimp.math.AiMatrix4x4;
 import assimp.math.AiQuaternion;
 import assimp.math.AiVector3D;
+import cpp.Pointer;
+import cpp.Star;
 import kha.Assets;
 import kha.Color;
 import kha.Framebuffer;
@@ -24,7 +26,7 @@ import kha.math.FastVector3;
 class Project 
 {
     private var importer:AssimpImporter;
-    private var scene:AiScene;
+    private var scene:Pointer<AiScene>;
     
     private var backbuffer:Image;
     private var effect:Effect;
@@ -43,7 +45,7 @@ class Project
         importer = new AssimpImporter();
         scene = importer.readFileFromMemory(Assets.blobs.char_fbx.toBytes(), AiPostProcess.triangulate | AiPostProcess.flipUVs);
         
-        if (scene == null || scene.flags == AiScene.AI_SCENE_FLAGS_INCOMPLETE || scene.rootNode == null) {
+        if (scene == null || scene.ptr.flags == AiScene.AI_SCENE_FLAGS_INCOMPLETE || scene.ptr.rootNode == null) {
             trace("Assimp scene loding failded.");
         } else {
             trace("Loding complete.");
@@ -55,54 +57,54 @@ class Project
             projectionMatrix = FastMatrix4.perspectiveProjection(45 * Math.PI / 180, Main.WIDTH / Main.HEIGHT, 0.1, 2000);
             viewMatrix = FastMatrix4.lookAt(new FastVector3( 800, 700, 800), new FastVector3(0, 400, 0), new FastVector3(0, 1, 0));
             
-            processNode(scene.rootNode);
+            processNode(scene.ptr.rootNode);
             
             backbuffer = Image.createRenderTarget(Main.WIDTH, Main.HEIGHT, TextureFormat.RGBA32, DepthStencilFormat.DepthAutoStencilAuto);
             System.notifyOnRender(render);
         }
     }
     
-    private function processNode(node:AiNode):Void
+    private function processNode(node:Pointer<AiNode>):Void
     {
-        for (i in 0...node.numMeshes) {
-            var meshIndex:Int = node.meshes[i];
-            processMesh(node, scene.meshes[meshIndex], i);
+        for (i in 0...node.ptr.numMeshes) {
+            var meshIndex:Int = node.ptr.meshes[i];
+            processMesh(node, scene.ptr.meshes[meshIndex], i);
         }
         
-        for (i in 0...node.numChildren) {
-            processNode(node.children[i]);
+        for (i in 0...node.ptr.numChildren) {
+            processNode(node.ptr.children[i]);
         }
     }
     
-    private function processMesh(node:AiNode, aiMesh:AiMesh, index:Int):Void
+    private function processMesh(node:Pointer<AiNode>, aiMesh:Pointer<AiMesh>, index:Int):Void
     {
         var transformation:FastMatrix4 = new FastMatrix4(
-                node.transformation.a1, node.transformation.a2, node.transformation.a3, node.transformation.a4,
-                node.transformation.b1, node.transformation.b2, node.transformation.b3, node.transformation.b4,
-                node.transformation.c1, node.transformation.c2, node.transformation.c3, node.transformation.c4,
-                node.transformation.d1, node.transformation.d2, node.transformation.d3, node.transformation.d4);
+                node.ptr.transformation.a1, node.ptr.transformation.a2, node.ptr.transformation.a3, node.ptr.transformation.a4,
+                node.ptr.transformation.b1, node.ptr.transformation.b2, node.ptr.transformation.b3, node.ptr.transformation.b4,
+                node.ptr.transformation.c1, node.ptr.transformation.c2, node.ptr.transformation.c3, node.ptr.transformation.c4,
+                node.ptr.transformation.d1, node.ptr.transformation.d2, node.ptr.transformation.d3, node.ptr.transformation.d4);
         
         var data:Array<Float> = new Array<Float>();
         var indices:Array<Int> = new Array<Int>();
         
-        for (i in 0...aiMesh.numVertices) {
-            data.push(aiMesh.vertices[i].x);
-            data.push(aiMesh.vertices[i].y);
-            data.push(aiMesh.vertices[i].z);
+        for (i in 0...aiMesh.ptr.numVertices) {
+            data.push(aiMesh.ptr.vertices[i].x);
+            data.push(aiMesh.ptr.vertices[i].y);
+            data.push(aiMesh.ptr.vertices[i].z);
             
             var u:Float = 0;
             var v:Float = 0;
-            if ( untyped __cpp__("aiMesh->ptr->mTextureCoords[0]") ) {
-                u = untyped __cpp__("aiMesh->ptr->mTextureCoords[0][i].x");
-                v = untyped __cpp__("aiMesh->ptr->mTextureCoords[0][i].y");
+            if (aiMesh.ptr.textureCoords[0] != null) {
+                u = aiMesh.ptr.textureCoords[0][i].x;
+                v = aiMesh.ptr.textureCoords[0][i].y;
             }
             
             data.push(u);
             data.push(v);
         }
         
-        for (i in 0...aiMesh.numFaces) {
-            var aiFace:AiFace = aiMesh.faces[i];
+        for (i in 0...aiMesh.ptr.numFaces) {
+            var aiFace:AiFace = aiMesh.ptr.faces[i];
             for (j in 0...aiFace.numIndices) {
                 var index:Int = aiFace.indices[j];
                 indices.push(index);
