@@ -21,6 +21,7 @@ class Mesh
     public var indexBuffer(default, null):IndexBuffer;
     
     public var transformMatrix:FastMatrix4;
+    public var textureName:String = "";
     public function new(data:Array<Float>, indices:Array<Int>, vertexStructure:VertexStructure, transformMatrix:FastMatrix4)
     {
         this.transformMatrix = transformMatrix;

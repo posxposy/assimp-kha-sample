@@ -1,16 +1,24 @@
 package;
 
 import assimp.AiFace;
+import assimp.AiMaterial;
 import assimp.AiMesh;
 import assimp.AiNode;
 import assimp.AiPostProcess;
 import assimp.AiScene;
+import assimp.AiString;
+import assimp.AiTextureType;
 import assimp.AssimpImporter;
 import assimp.math.AiMatrix4x4;
 import assimp.math.AiQuaternion;
 import assimp.math.AiVector3D;
+import cpp.ArrayBase;
 import cpp.Pointer;
+import cpp.Reference;
 import cpp.Star;
+import cpp.Struct;
+import haxe.ds.StringMap;
+import haxe.io.Path;
 import kha.Assets;
 import kha.Color;
 import kha.Framebuffer;
@@ -35,6 +43,7 @@ class Project
     
     private var meshes:Array<Mesh>;
     private var diffuseImage:Image;
+    private var textures:StringMap<Image>;
     public function new() 
     {
         Assets.loadEverything(loadingComplete);
@@ -43,6 +52,7 @@ class Project
     public function loadingComplete():Void
     {
         importer = new AssimpImporter();
+        //scene = importer.readFileFromMemory(Assets.blobs.SponzaNoFlag_obj.toBytes(), AiPostProcess.triangulate | AiPostProcess.flipUVs);
         scene = importer.readFileFromMemory(Assets.blobs.char_fbx.toBytes(), AiPostProcess.triangulate | AiPostProcess.flipUVs);
         
         if (scene == null || scene.ptr.flags == AiScene.AI_SCENE_FLAGS_INCOMPLETE || scene.ptr.rootNode == null) {
@@ -52,10 +62,10 @@ class Project
             
             effect = new Effect();
             meshes = new Array<Mesh>();
-            diffuseImage = Assets.images.diffuse;
+            textures = new StringMap<Image>();
             
-            projectionMatrix = FastMatrix4.perspectiveProjection(45 * Math.PI / 180, Main.WIDTH / Main.HEIGHT, 0.1, 2000);
-            viewMatrix = FastMatrix4.lookAt(new FastVector3( 800, 700, 800), new FastVector3(0, 400, 0), new FastVector3(0, 1, 0));
+            projectionMatrix = FastMatrix4.perspectiveProjection(45 * Math.PI / 180, Main.WIDTH / Main.HEIGHT, 0.1, 10000);
+            viewMatrix = FastMatrix4.lookAt(new FastVector3(800, 700, 800), new FastVector3(0, 400, 0), new FastVector3(0, 1, 0));
             
             processNode(scene.ptr.rootNode);
             
@@ -111,7 +121,33 @@ class Project
             }
         }
         
-        meshes.push(new Mesh(data, indices, effect.structure, transformation));
+        var mesh:Mesh = new Mesh(data, indices, effect.structure, transformation);
+        meshes.push(mesh);
+        
+        if (scene.ptr.hasMaterials()) {
+            if (aiMesh.ptr.materialIndex >= 0) {
+                var aiMaterial:Pointer<AiMaterial> = scene.ptr.materials[aiMesh.ptr.materialIndex];
+                var count:Int =  aiMaterial.ptr.getTextureCount(AiTextureType.aiTextureType_DIFFUSE);
+                for (l in 0...count) {
+                    var path:Pointer<AiString> = AiString.create();
+                    aiMaterial.ptr.getTexture(AiTextureType.aiTextureType_DIFFUSE, l, path.ptr);
+                    var texturePath:String = path.ptr.c_str().toString();
+                    var textureName:String = Path.withoutDirectory(texturePath);
+                    
+                    mesh.textureName = textureName;
+                    
+                    if (!textures.exists(textureName)) {
+                        var withoutExtension:String = textureName.substring(0, textureName.lastIndexOf("."));
+                        textures.set(textureName, Reflect.field(Assets.images, withoutExtension));
+                    }
+                    
+                    path.destroy();
+                    path = null;
+                }
+            }
+        } else {
+            trace("There is no materials in current scene");
+        }
     }
 
     public function render(framebuffer: Framebuffer): Void 
@@ -123,10 +159,11 @@ class Project
         g4.setMatrix(effect.viewMatrixID, viewMatrix);
         g4.setMatrix(effect.projectionMatrixID, projectionMatrix);
         
-        
-        g4.setTexture(effect.textureID, diffuseImage);
         for (mesh in meshes) {
-            g4.setMatrix(effect.modelMatrixID, mesh.transformMatrix);
+            if (textures.exists(mesh.textureName)) {
+                g4.setTexture(effect.textureID, textures.get(mesh.textureName));
+            }
+            g4.setMatrix(effect.modelMatrixID, FastMatrix4.rotationY(Scheduler.time() * 0.5).multmat(mesh.transformMatrix));
             
             g4.setIndexBuffer(mesh.indexBuffer);
             g4.setVertexBuffer(mesh.vertexBuffer);
